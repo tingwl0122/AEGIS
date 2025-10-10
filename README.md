@@ -1,4 +1,4 @@
-# AEGIS: Automated Error Generation and Identification for Multi-Agent Systems
+# AEGIS: Automated Error Generation and Attribution for Multi-Agent Systems
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
@@ -255,7 +255,7 @@ If you use AEGIS in your research, please cite:
 
 ```bibtex
 @article{kong2025aegis,
-  title={AEGIS: Automated Error Generation and Identification for Multi-Agent Systems},
+  title={AEGIS: Automated Error Generation and Attribution for Multi-Agent Systems},
   author={Kong, Fanqi and Zhang, Ruijie and Yin, Huaxiao and Zhang, Guibin and Zhang, Xiaofei and Chen, Ziang and Zhang, Zhaowei and Zhang, Xiaoyuan and Zhu, Song-Chun and Feng, Xue},
   journal={arXiv preprint arXiv:2509.14295},
   year={2025}
