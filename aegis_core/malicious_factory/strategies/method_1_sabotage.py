@@ -5,7 +5,7 @@ from typing import Tuple
 
 # Import the base class and type hints
 from ..base_strategy import BaseMaliciousStrategy
-from task import Task
+from core.task import Task
 
 class Method1SabotageStrategy(BaseMaliciousStrategy):
     """

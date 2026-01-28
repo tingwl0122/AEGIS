@@ -5,6 +5,10 @@
 [![arXiv](https://img.shields.io/badge/📄%20arXiv-2509.14295-red.svg)](https://arxiv.org/abs/2509.14295)
 [![Dataset](https://img.shields.io/badge/🤗%20Hugging%20Face-Dataset-yellow)](https://huggingface.co/datasets/Fancylalala/AEGIS)
 
+## 🔥 News
+
+- **[2026.01]** Our paper has been accepted by **ICLR 2026**! 🎉
+
 ## 🎯 Overview
 
 <div align="center">
@@ -25,22 +29,24 @@ AEGIS is a **large-scale dataset and benchmark** for detecting errors in Multi-A
 
 ```
 AEGIS/
-├── aegis_core/           # Core AEGIS framework
-│   ├── malicious_factory/    # Error injection system
-│   ├── agent_systems/        # MAS wrapper interfaces
-│   ├── utils/               # Utility functions
-│   └── core/                # Core detection modules
-├── mas_frameworks/       # Multi-Agent System implementations
-│   ├── agentverse/          # AgentVerse framework
+├── aegis_core/              # Core AEGIS framework
+│   ├── malicious_factory/   # Error injection system (FMMaliciousFactory)
+│   ├── agent_systems/       # MAS wrapper interfaces
+│   └── utils/               # Utility functions
+├── core/                    # Core task definitions
+├── methods/                 # MAS method implementations
 │   ├── dylan/               # DyLAN framework
+│   ├── agentverse/          # AgentVerse framework
 │   ├── llm_debate/          # LLM Debate framework
 │   ├── macnet/              # MacNet framework
 │   └── ...                  # Other MAS frameworks
-├── magnetic_one/         # Magnetic-One specific integration
-├── configs/              # Configuration files
-├── examples/             # Usage examples
-├── evaluation/           # Evaluation utilities
-└── scripts/              # Helper scripts
+├── magnetic_one/            # Magnetic-One specific integration
+├── model_api_configs/       # API configuration files
+├── experiments/             # Experiment configurations
+├── configs/                 # MAS framework configs
+├── examples/                # Usage examples
+├── evaluation/              # Evaluation utilities
+└── utils/                   # General utilities
 ```
 
 ## 🚀 Quick Start
@@ -61,28 +67,41 @@ pip install -r requirements.txt
 Copy and modify the configuration files:
 
 ```bash
-cp configs/model_api_config.json configs/your_config.json
-# Edit your_config.json with your API keys and settings
+# Copy model API configuration template
+cp model_api_configs/model_api_config.json.template model_api_configs/model_api_config.json
+# Edit with your API keys and endpoints
 ```
 
 ### 3. Basic Usage
 
 ```python
-from aegis_core.malicious_factory import MaliciousFactory
-from aegis_core.agent_systems import BaseMASWrapper
+from aegis_core.malicious_factory import (
+    FMMaliciousFactory,
+    FMErrorType,
+    InjectionStrategy,
+    AgentContext
+)
 
-# Initialize AEGIS
-factory = MaliciousFactory()
+# Initialize the FM Malicious Factory (LLM optional for instruction generation)
+factory = FMMaliciousFactory(llm=None)
 
-# Load a MAS framework
-mas_wrapper = BaseMASWrapper("dylan", config_path="configs/config_main.yaml")
+# Create agent context
+agent_context = AgentContext(
+    role_name="MathSolver",
+    role_type="Specialist Agent",
+    agent_id="agent_001",
+    system_message="You are a math problem solver.",
+    tools=["calculator"],
+    description="A specialized agent for math problems"
+)
 
-# Inject errors and generate dataset
-results = factory.generate_error_dataset(
-    mas_wrapper=mas_wrapper,
-    tasks=["task1", "task2"],
-    error_modes=["FM-1.1", "FM-2.3"],
-    num_samples=100
+# Generate injection instruction for a specific FM error type
+task_context = "Solve: 2x + 5 = 17"
+instruction = factory.get_injection_instruction(
+    fm_type=FMErrorType.FM_2_3,  # Deviate from main goal
+    agent_context=agent_context,
+    injection_strategy=InjectionStrategy.PROMPT_INJECTION,
+    task_context=task_context
 )
 ```
 
@@ -186,10 +205,10 @@ Copy and configure the model API template:
 
 ```bash
 # Copy model configuration template
-cp configs/model_api_config.json.template configs/model_api_config.json
+cp configs/model_api_config.json.template model_api_configs/model_api_config.json
 
 # Edit with your actual endpoints and keys
-nano configs/model_api_config.json
+nano model_api_configs/model_api_config.json
 ```
 
 **Example configuration**:
@@ -227,11 +246,11 @@ nano configs/model_api_config.json
 
 ### 4. Security Best Practices
 
-- ✅ **Never commit** `.env` or `configs/model_api_config.json` files
-- ✅ **Use environment variables** instead of hardcoding keys
-- ✅ **Rotate API keys** regularly  
-- ✅ **Set usage limits** on your API accounts
-- ✅ **Monitor API usage** to detect unauthorized access
+- **Never commit** `.env` or `model_api_configs/model_api_config.json` files
+- **Use environment variables** instead of hardcoding keys
+- **Rotate API keys** regularly
+- **Set usage limits** on your API accounts
+- **Monitor API usage** to detect unauthorized access
 
 ### MAS Framework Configuration
 
@@ -245,9 +264,8 @@ Each MAS framework has its own configuration file in `configs/`:
 
 See the `examples/` directory for detailed usage examples:
 
-- `basic_error_injection.py`: Simple error injection workflow
+- `basic_error_injection.py`: FM error injection workflow with FMMaliciousFactory
 - `multi_framework_evaluation.py`: Comparing different MAS frameworks
-- `custom_error_modes.py`: Implementing custom error types
 
 ## 📚 Citation
 

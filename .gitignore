@@ -56,5 +56,16 @@ tmp/
 
 # Model outputs and data
 results/
+results_inj/
 outputs/
 wandb/
+
+# Model API Config (use template instead)
+model_api_configs/model_api_config.json
+
+# Injection logs
+magnetic_one/injection_logs/
+**/injection_logs/
+
+# Large datasets (download separately)
+datasets/
