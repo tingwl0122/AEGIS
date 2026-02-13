@@ -1,4 +1,28 @@
 #!/usr/bin/env python3
+"""
+Qwen Anomaly Detection Script with vLLM support
+
+Multi-GPU strategy (data parallel, default):
+  Spawns one INDEPENDENT vLLM process per GPU. Each process sets its own
+  CUDA_VISIBLE_DEVICES so there is NO inter-GPU communication (no NCCL, no gloo).
+  This avoids the all_reduce timeout bug in vLLM's built-in DP mode.
+
+Usage:
+    # Single GPU with vLLM
+    python qwen_anomaly_detection.py --input data/test.jsonl --output results.jsonl --use_vllm --gpu_ids 0
+
+    # Data parallel across 8 GPUs (default, recommended)
+    python qwen_anomaly_detection.py --input data/test.jsonl --output results.jsonl --use_vllm --gpu_ids 0,1,2,3,4,5,6,7
+
+    # Tensor parallel across 4 GPUs (must divide num_attention_heads=28)
+    python qwen_anomaly_detection.py --input data/test.jsonl --output results.jsonl --use_vllm --gpu_ids 0,1,2,3 --parallel_mode tp
+
+    # With HuggingFace (default backend)
+    python qwen_anomaly_detection.py --input data/test.jsonl --output results.jsonl
+
+    # Custom context length and memory
+    python qwen_anomaly_detection.py --input data/test.jsonl --output results.jsonl --use_vllm --gpu_ids 0,1 --max_model_len 32768 --gpu_memory_utilization 0.85
+"""
 
 import json
 import argparse
@@ -703,6 +727,54 @@ class QwenAnomalyDetector:
         with open(prompt_file, 'r', encoding='utf-8') as f:
             return f.read()
 
+    # def detect_anomalies_batch(self, conversation_texts: List[str], max_retries: int = 3) -> tuple[List[Dict], List[str]]:
+    #     """
+    #     Batch anomaly detection.
+
+    #     Returns:
+    #         Tuple of (detection results, raw responses).
+    #     """
+    #     if not conversation_texts:
+    #         return [], []
+
+    #     prompt_template = self.load_prompt_template('/data_storage/zyf/zjr/mas_l/AEGIS/evaluation/prompt_cot.txt')
+
+    #     # Determine effective context length
+    #     if self.use_vllm:
+    #         # vLLM: get from engine config
+    #         try:
+    #             effective_max_ctx = self.llm.llm_engine.model_config.max_model_len
+    #         except Exception:
+    #             effective_max_ctx = 32768
+    #     else:
+    #         # HF: get from model config
+    #         try:
+    #             effective_max_ctx = getattr(self.model.config, 'max_position_embeddings', 32768)
+    #         except Exception:
+    #             effective_max_ctx = 32768
+
+    #     # Truncate each conversation to fit within context window
+    #     truncated_texts = [
+    #         truncate_conversation_to_fit(
+    #             conversation_text=ct,
+    #             prompt_template=prompt_template,
+    #             tokenizer=self.tokenizer,
+    #             max_context_len=effective_max_ctx,
+    #             max_new_tokens=self.max_new_tokens,
+    #             enable_thinking=self.enable_thinking,
+    #             model_name=self.model_name,
+    #         )
+    #         for ct in conversation_texts
+    #     ]
+
+    #     # Build chat messages
+    #     batch_messages = [build_prompt_messages(ct, prompt_template) for ct in truncated_texts]
+
+    #     if self.use_vllm:
+    #         return self._detect_with_vllm(batch_messages)
+    #     else:
+    #         return self._detect_with_hf(batch_messages, max_retries)
+
     def _detect_with_vllm(self, batch_messages: List[List[Dict]]) -> tuple[List[Dict], List[str]]:
         """Run batch inference using vLLM."""
         prompts = []
@@ -728,6 +800,77 @@ class QwenAnomalyDetector:
             logger.error(f"vLLM inference failed: {e}")
             n = len(batch_messages)
             return [{"faulty_agents": []}] * n, ["ERROR"] * n
+
+    # def _detect_with_hf(self, batch_messages: List[List[Dict]], max_retries: int) -> tuple[List[Dict], List[str]]:
+    #     """Run batch inference using HuggingFace Transformers."""
+    #     for attempt in range(max_retries):
+    #         try:
+    #             batch_texts = []
+    #             for messages in batch_messages:
+    #                 if "qwen3" in self.model_name.lower() and self.enable_thinking:
+    #                     t = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=True)
+    #                 else:
+    #                     t = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    #                 batch_texts.append(t)
+
+    #             model_inputs = self.tokenizer(
+    #                 batch_texts, return_tensors="pt", padding=True, truncation=True, max_length=65536,
+    #             ).to(self.model.device)
+
+    #             with torch.no_grad():
+    #                 generated_ids = self.model.generate(
+    #                     **model_inputs, max_new_tokens=self.max_new_tokens,
+    #                     temperature=1.0, top_p=0.99, do_sample=True,
+    #                     pad_token_id=self.tokenizer.eos_token_id,
+    #                     eos_token_id=self.tokenizer.eos_token_id,
+    #                 )
+
+    #             # Decode only newly generated tokens
+    #             new_ids = [out[len(inp):] for inp, out in zip(model_inputs.input_ids, generated_ids)]
+    #             responses = self.tokenizer.batch_decode(new_ids, skip_special_tokens=True)
+
+    #             results, raws = [], []
+    #             for resp in responses:
+    #                 raws.append(resp)
+    #                 results.append(parse_response(resp))
+
+    #             del model_inputs, generated_ids
+    #             if torch.cuda.is_available():
+    #                 torch.cuda.empty_cache()
+    #             return results, raws
+
+    #         except Exception as e:
+    #             logger.error(f"HF inference failed (attempt {attempt+1}/{max_retries}): {e}")
+    #             if attempt == max_retries - 1:
+    #                 n = len(batch_messages)
+    #                 return [{"faulty_agents": []}] * n, ["ERROR"] * n
+    #             time.sleep(2)
+
+    #     n = len(batch_messages)
+    #     return [{"faulty_agents": []}] * n, ["FAILED"] * n
+
+    # def evaluate_samples_batch(self, samples: List[Dict]) -> List[Dict]:
+    #     """Evaluate a batch of samples for anomaly detection."""
+    #     if not samples:
+    #         return []
+    #     try:
+    #         texts = [extract_conversation_text(s.get('input', {})) for s in samples]
+    #         detections, raws = self.detect_anomalies_batch(texts)
+    #         results = []
+    #         for sample, det, raw in zip(samples, detections, raws):
+    #             results.append({
+    #                 "id": sample.get("id"),
+    #                 "metadata": sample.get("metadata"),
+    #                 "input": sample.get("input"),
+    #                 "ground_truth": sample.get("output"),
+    #                 "model_detection": det,
+    #                 "raw_response": raw,
+    #             })
+    #         return results
+    #     except Exception as e:
+    #         logger.error(f"Batch evaluation failed: {e}")
+    #         return [{"id": s.get("id"), "error": str(e), "timestamp": time.time()} for s in samples]
+
 
 # ============================================================
 # Main
@@ -826,6 +969,53 @@ def main():
         else:
             save_results(all_results, args.output)
 
+    # ========================================
+    # Path 2: Single-GPU / TP / HuggingFace
+    # ========================================
+    # else:
+    #     tp_size = num_gpus if (args.parallel_mode == "tp" and num_gpus > 1) else 1
+
+    #     detector = QwenAnomalyDetector(
+    #         model_name=args.model_name,
+    #         max_new_tokens=args.max_new_tokens,
+    #         enable_thinking=args.enable_thinking,
+    #         use_vllm=args.use_vllm,
+    #         tensor_parallel_size=tp_size,
+    #         gpu_memory_utilization=args.gpu_memory_utilization,
+    #         max_model_len=args.max_model_len,
+    #     )
+
+    #     logger.info("Starting anomaly detection...")
+    #     batch_size = args.batch_size
+    #     save_interval = 20
+    #     all_results = []
+    #     total_batches = (len(samples) - 1) // batch_size + 1
+
+    #     for batch_start in tqdm(range(0, len(samples), batch_size),
+    #                             desc="Processing batches", total=total_batches):
+    #         batch_end = min(batch_start + batch_size, len(samples))
+    #         batch_samples = samples[batch_start:batch_end]
+
+    #         logger.info(f"Batch {batch_start // batch_size + 1}/{total_batches}: "
+    #                     f"samples {batch_start + 1}-{batch_end}")
+
+    #         batch_results = detector.evaluate_samples_batch(batch_samples)
+    #         all_results.extend(batch_results)
+
+    #         # Save periodically
+    #         if len(all_results) >= save_interval or batch_end == len(samples):
+    #             if args.resume:
+    #                 append_results(all_results, args.output)
+    #             else:
+    #                 if batch_start == 0:
+    #                     save_results(all_results, args.output)
+    #                 else:
+    #                     append_results(all_results, args.output)
+    #             logger.info(f"Saved {len(all_results)} results")
+    #             all_results = []
+
+    #         if not args.use_vllm:
+    #             time.sleep(0.5)
 
     logger.info("Processing complete!")
 

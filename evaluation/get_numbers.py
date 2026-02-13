@@ -72,7 +72,7 @@ def compute_micro_f1(all_gt: List[Set], all_pred: List[Set]) -> Dict:
     total_tp = 0
     total_fp = 0
     total_fn = 0
-
+    assert len(all_gt) == len(all_pred), (len(all_gt), len(all_pred))
     for gt, pred in zip(all_gt, all_pred):
         tp = len(gt & pred)
         fp = len(pred - gt)
@@ -88,47 +88,45 @@ def compute_micro_f1(all_gt: List[Set], all_pred: List[Set]) -> Dict:
     return {
         "precision": precision,
         "recall": recall,
-        "f1": f1,
+        "micro_f1": f1,
         "tp": total_tp,
         "fp": total_fp,
         "fn": total_fn,
     }
 
 
-def compute_macro_f1(all_gt: List[Set], all_pred: List[Set], all_classes: List[str] = None) -> Dict:
+def compute_macro_f1(
+    all_gt: List[Set],
+    all_pred: List[Set],
+    all_classes: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     """
-    Macro-F1: compute F1 per class independently, then take unweighted average.
+    Macro-F1 (two variants):
+      1) macro_f1_all_classes: average over ALL classes in `all_classes`
+         (or union of GT if all_classes is None). Includes zero-support classes as F1=0.
+      2) macro_f1_skip_zero_support: average only over classes with GT support > 0
+         (support = TP + FN > 0). Zero-support classes are excluded from averaging.
 
-    Per the paper: "Macro-F1 computes the F1-score for each class independently and then
-    takes the unweighted average. This makes Macro-F1 a crucial indicator of a model's
-    ability to handle infrequent error modes and avoid bias towards common error modes."
-
-    For each class c across all N samples:
-      - TP = number of samples where c is in both gt and pred
-      - FP = number of samples where c is in pred but not gt
-      - FN = number of samples where c is in gt but not pred
-      - Per-class P, R, F1 computed from these counts
-      - Macro-F1 = unweighted mean of per-class F1 scores
-
-    Args:
-        all_gt: List of ground truth label sets, one per sample.
-        all_pred: List of predicted label sets, one per sample.
-        all_classes: Fixed set of classes to evaluate. If provided, computes F1 for
-                     each class in this list (e.g., the 14 error codes for Error-level).
-                     If None, uses the union of all classes seen in gt (not pred-only
-                     classes, which would inflate the denominator).
-
-    Returns:
-        Dict with macro_f1, num_classes, and per_class breakdown.
+    Returns both metrics + per-class stats and counts of averaged classes.
     """
+    assert len(all_gt) == len(all_pred), (len(all_gt), len(all_pred))
+
+    # Determine class set
     if all_classes is None:
-        # Use classes that appear in ground truth (standard for Macro-F1)
-        all_classes_set = set()
+        cls = set()
         for gt in all_gt:
-            all_classes_set.update(gt)
-        all_classes = sorted(all_classes_set)
+            cls.update(gt)
+        all_classes = sorted(cls)
+    else:
+        all_classes = list(all_classes)  # snapshot
 
-    per_class = {}
+    per_class: Dict[str, Dict[str, float]] = {}
+
+    f1_all = []
+    f1_nz = []
+    used_all = 0
+    used_nz = 0
+
     for c in all_classes:
         tp = sum(1 for gt, pred in zip(all_gt, all_pred) if c in gt and c in pred)
         fp = sum(1 for gt, pred in zip(all_gt, all_pred) if c in pred and c not in gt)
@@ -138,15 +136,36 @@ def compute_macro_f1(all_gt: List[Set], all_pred: List[Set], all_classes: List[s
         r = tp / (tp + fn) if (tp + fn) > 0 else 0.0
         f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
 
-        per_class[c] = {"precision": p, "recall": r, "f1": f1, "tp": tp, "fp": fp, "fn": fn}
+        support = tp + fn  # GT positives for this class
 
-    # Macro average: unweighted mean of per-class F1
-    f1_values = [v["f1"] for v in per_class.values()]
-    macro_f1 = sum(f1_values) / len(f1_values) if f1_values else 0.0
+        per_class[c] = {
+            "precision": p,
+            "recall": r,
+            "f1": f1,
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
+            "support": support,
+        }
+
+        # (1) include all classes
+        f1_all.append(f1)
+        used_all += 1
+
+        # (2) skip zero-support classes
+        if support > 0:
+            f1_nz.append(f1)
+            used_nz += 1
+
+    macro_all = sum(f1_all) / used_all if used_all > 0 else 0.0
+    macro_skip0 = sum(f1_nz) / used_nz if used_nz > 0 else 0.0
 
     return {
-        "macro_f1": macro_f1,
-        "num_classes": len(all_classes),
+        "macro_f1_all_classes": macro_all,
+        "macro_f1_skip_zero_support": macro_skip0,
+        "num_classes_total": len(all_classes),
+        "num_classes_averaged_all": used_all,          # same as total
+        "num_classes_averaged_nonzero": used_nz,       # excludes zero-support
         "per_class": per_class,
     }
 
