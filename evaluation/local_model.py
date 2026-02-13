@@ -162,8 +162,12 @@ class QwenAnomalyDetector:
         if not conversation_texts:
             return []
             
-        prompt_template = self.load_prompt_template('/home/fanqi/verl/AMEeval/prompt.txt')
+        # for cot
+        prompt_template = self.load_prompt_template('/data_storage/zyf/zjr/mas_l/AEGIS/evaluation/prompt_cot.txt')
+        # for not cot
+        # prompt_template = self.load_prompt_template('/data_storage/zyf/zjr/mas_l/AEGIS/evaluation/prompt.txt')
         
+
         prompts = [prompt_template.format(conversation_text=text) for text in conversation_texts]
         
         for attempt in range(max_retries):

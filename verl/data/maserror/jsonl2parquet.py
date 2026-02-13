@@ -150,7 +150,7 @@ def main():
                        help="输出目录")
     parser.add_argument("--val_ratio", 
                        type=float, 
-                       default=0.15,
+                       default=0,
                        help="验证集比例 (默认0.15，即15%)")
     parser.add_argument("--random_seed", 
                        type=int, 

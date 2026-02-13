@@ -15,10 +15,19 @@ fi
 nproc_per_node=$1
 save_path=$2
 
+export HF_HOME="/data_storage/zyf/.cache/huggingface/" 
+
+export http_proxy=http://100.68.168.184:3128/ 
+export https_proxy=http://100.68.168.184:3128/ 
+export HTTP_PROXY=http://100.68.168.184:3128/ 
+export HTTPS_PROXY=http://100.68.168.184:3128/ 
+
+
 
 # 数据路径
-TRAIN_DATA="/home/fanqi/verl/data/maserror/train.parquet"
-VAL_DATA="/home/fanqi/verl/data/maserror/val.parquet"
+TRAIN_DATA="/data_storage/zyf/zjr/mas_l/AEGIS/verl/data/maserror/converted/train.parquet"
+VAL_DATA="/data_storage/zyf/zjr/mas_l/AEGIS/verl/data/maserror/converted/val.parquet"
+MODEL="Qwen/Qwen2.5-7B-Instruct"
 
 # 创建输出目录
 mkdir -p "$save_path"
@@ -31,12 +40,18 @@ torchrun --standalone --nnodes=1 --nproc_per_node=$nproc_per_node \
     data.response_key=extra_info \
     data.prompt_dict_keys=['question'] \
     data.response_dict_keys=['answer'] \
-    data.micro_batch_size_per_gpu=4 \
-    data.train_batch_size=32 \
+    data.micro_batch_size_per_gpu=1 \
+    data.train_batch_size=64 \
     data.max_length=8192 \
     data.truncation=right \
-    model.partial_pretrain=Qwen/Qwen3-8B \
+    optim.lr=3e-6 \
+    optim.weight_decay=0.01 \
+    optim.clip_grad=1.0 \
+    optim.warmup_steps_ratio=0.1 \
+    optim.lr_scheduler=cosine \
+    model.partial_pretrain=$MODEL \
     model.trust_remote_code=True \
+    model.lora_rank=0\
     model.lora_alpha=16 \
     model.target_modules=all-linear \
     model.fsdp_config.cpu_offload=True \
@@ -46,10 +61,10 @@ torchrun --standalone --nnodes=1 --nproc_per_node=$nproc_per_node \
     model.strategy=fsdp \
     trainer.default_local_dir=$save_path \
     trainer.project_name=mas_error_attribution \
-    trainer.experiment_name=qwen3-8b-sft \
+    trainer.experiment_name=qwen2.7-7b-sft \
     trainer.logger=[console,wandb] \
     trainer.total_epochs=3 \
-    trainer.save_freq=870 \
-    trainer.test_freq=300 \
+    trainer.save_freq=100 \
+    trainer.test_freq=100 \
     trainer.default_hdfs_dir=null \
     trainer.n_gpus_per_node=$nproc_per_node 

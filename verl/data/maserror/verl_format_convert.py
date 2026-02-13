@@ -37,57 +37,7 @@ def format_conversation_history(input_data):
         conversation_text += f"Step {step} - {agent_name} ({agent_role}) [{phase}]:\n{content}\n\n"
     
     # 添加任务指令
-#     PROMPT_TEMPLATE = """## ROLE AND GOAL
-# You are a meticulous Multi-Agent System (MAS) Quality Assurance analyst. Your sole purpose is to analyze conversation logs to identify and categorize agent errors based on a strict set of definitions.
-
-# ## ERROR DEFINITIONS WITH EXAMPLES
-# You MUST use the exact error codes provided below.
-
-# ### Functional Mistakes (FM-1.x - Task Execution Errors):
-# - FM-1.1: **Task specification deviation** - Agent deviates from specified task requirements (e.g., was asked to write code in Python, but used JavaScript).
-# - FM-1.2: **Role specification deviation** - Agent acts outside its designated role (e.g., a 'CodeWriter' agent starts criticizing other agents' work, which is the 'Critic's' role).
-# - FM-1.3: **Add redundant steps** - Agent adds unnecessary or duplicate steps (e.g., imports a library that was already imported in a previous step).
-# - FM-1.4: **Remove conversation history** - Agent ignores or removes important context from previous turns (e.g., ignores a user's correction from the previous message).
-# - FM-1.5: **Remove termination conditions** - Agent fails to define proper stopping criteria, leading to loops or unfinished tasks (e.g., writes a recursive function with no base case).
-
-# ### Functional Mistakes (FM-2.x - Communication & Coordination Errors):
-# - FM-2.1: **Repeat handled tasks** - Agent redundantly handles already completed tasks (e.g., re-writes a piece of code that was already finalized and approved).
-# - FM-2.2: **Make request ambiguous** - Agent provides unclear or confusing instructions to other agents (e.g., asks another agent to "handle the data" without specifying how).
-# - FM-2.3: **Deviate from main goal** - Agent pursues objectives unrelated to the main task (e.g., starts discussing the history of programming languages in the middle of a coding task).
-# - FM-2.4: **Hide important information** - Agent withholds crucial information needed by other agents (e.g., knows a library has a bug but doesn't mention it).
-# - FM-2.5: **Ignore other agents** - Agent fails to consider input, corrections, or questions from other agents.
-# - FM-2.6: **Inconsistent reasoning** - Agent's logic contradicts its own previous statements (e.g., in step 2 agent says 'option A is best', but in step 4 says 'option A is a bad choice' without new information).
-
-# ### Functional Mistakes (FM-3.x - Quality & Verification Errors):
-# - FM-3.1: **Premature termination** - Agent stops or declares the task complete before all requirements are met.
-# - FM-3.2: **Remove verification steps** - Agent skips necessary validation or testing steps (e.g., writes code but doesn't write any unit tests for it).
-# - FM-3.3: **Incorrect verification** - Agent performs flawed or wrong verification (e.g., writes a test that doesn't actually check for the correct condition).
-
-# ## ANALYSIS WORKFLOW
-# 1.  **Internal Analysis (Chain of Thought)**: First, mentally break down the conversation turn by turn. For each agent's response, critically evaluate its actions against the error definitions. Note down any potential violations, the agent's name, and the corresponding error code.
-# 2.  **Compile Final Output**: After completing your analysis, aggregate all identified faults into the required JSON format. If you found no errors, create an empty list for "faulty_agents".
-
-# ## STRICT OUTPUT FORMAT
-# Your final response **MUST BE A SINGLE, VALID JSON OBJECT** and nothing else. Do not include any explanatory text, comments, or markdown formatting like ```json.
-
-# **Correct Format:**
-# {{"faulty_agents": [{{"agent_name": "XXX", "error_type": "FM-X.X"}}]}}
-
-# **Example for Multiple Errors:**
-# {{"faulty_agents": [{{"agent_name": "XXX1", "error_type": "FM-1.1"}}, {{"agent_name": "XXX2", "error_type": "FM-3.2"}}, {{"agent_name": "XXX3", "error_type": "FM-2.5"}}]}}
-
-# **Example for No Errors:**
-# {{"faulty_agents": []}}
-
-# ## CONVERSATION TO ANALYZE:
-# \"\"\"
-# {conversation_text}
-# \"\"\"
-
-# ## YOUR ANALYSIS (JSON ONLY):
-# """
-    COT_PROMPT_TEMPLATE = """
-    ## ROLE AND GOAL
+    PROMPT_TEMPLATE = """## ROLE AND GOAL
 You are a meticulous Multi-Agent System (MAS) Quality Assurance analyst. Your sole purpose is to analyze conversation logs to identify and categorize agent errors based on a strict set of definitions.
 
 ## ERROR DEFINITIONS WITH EXAMPLES
@@ -114,48 +64,100 @@ You MUST use the exact error codes provided below.
 - FM-3.3: **Incorrect verification** - Agent performs flawed or wrong verification (e.g., writes a test that doesn't actually check for the correct condition).
 
 ## ANALYSIS WORKFLOW
-Please follow these steps carefully:
+1.  **Internal Analysis (Chain of Thought)**: First, mentally break down the conversation turn by turn. For each agent's response, critically evaluate its actions against the error definitions. Note down any potential violations, the agent's name, and the corresponding error code.
+2.  **Compile Final Output**: After completing your analysis, aggregate all identified faults into the required JSON format. If you found no errors, create an empty list for "faulty_agents".
 
-### Step 1: Agent Summary
-First, analyze and summarize what each agent has done throughout the conversation:
-- List each agent that appears in the conversation
-- For each agent, summarize their main actions, decisions, and contributions
-- Note any patterns or recurring behaviors
+## STRICT OUTPUT FORMAT
+Your final response **MUST BE A SINGLE, VALID JSON OBJECT** and nothing else. Do not include any explanatory text, comments, or markdown formatting like ```json.
 
-### Step 2: Error Analysis
-For each agent identified in Step 1:
-- Carefully examine their actions against each error definition
-- Look for violations of task requirements, role boundaries, communication issues, or quality problems
-- Note any potential errors with specific reasoning
-
-### Step 3: Final Judgment
-Based on your analysis in Steps 1 and 2:
-- Determine which agents (if any) committed errors
-- Assign the appropriate error code(s) to each faulty agent
-- Ensure agent names match exactly as they appear in the conversation log
-
-## REQUIRED OUTPUT FORMAT
-Your response must contain:
-
-1. **Agent Summary**: A brief analysis of what each agent did
-2. **Error Analysis**: Your reasoning for identifying errors
-3. **Final Answer**: A valid JSON object with your conclusions
-
-**JSON Format:**
+**Correct Format:**
 {{"faulty_agents": [{{"agent_name": "XXX", "error_type": "FM-X.X"}}]}}
 
-**Examples:**
-- Multiple Errors: {{"faulty_agents": [{{"agent_name": "XXX1", "error_type": "FM-1.1"}}, {{"agent_name": "XXX2", "error_type": "FM-3.2"}}, {{"agent_name": "XXX3", "error_type": "FM-2.5"}}]}}
-- No Errors: {{"faulty_agents": []}}
+**Example for Multiple Errors:**
+{{"faulty_agents": [{{"agent_name": "XXX1", "error_type": "FM-1.1"}}, {{"agent_name": "XXX2", "error_type": "FM-3.2"}}, {{"agent_name": "XXX3", "error_type": "FM-2.5"}}]}}
 
-**Important:** Make sure the agent names you output exactly match those in the conversation log. Do not fabricate names.
+**Example for No Errors:**
+{{"faulty_agents": []}}
 
 ## CONVERSATION TO ANALYZE:
+\"\"\"
 {conversation_text}
+\"\"\"
 
-## YOUR ANALYSIS:
+## YOUR ANALYSIS (JSON ONLY):
 """
-    return COT_PROMPT_TEMPLATE.format(conversation_text=conversation_text)
+    return PROMPT_TEMPLATE.format(conversation_text=conversation_text)
+
+#     COT_PROMPT_TEMPLATE = """
+#     ## ROLE AND GOAL
+# You are a meticulous Multi-Agent System (MAS) Quality Assurance analyst. Your sole purpose is to analyze conversation logs to identify and categorize agent errors based on a strict set of definitions.
+
+# ## ERROR DEFINITIONS WITH EXAMPLES
+# You MUST use the exact error codes provided below.
+
+# ### Functional Mistakes (FM-1.x - Task Execution Errors):
+# - FM-1.1: **Task specification deviation** - Agent deviates from specified task requirements (e.g., was asked to write code in Python, but used JavaScript).
+# - FM-1.2: **Role specification deviation** - Agent acts outside its designated role (e.g., a 'CodeWriter' agent starts criticizing other agents' work, which is the 'Critic's' role).
+# - FM-1.3: **Add redundant steps** - Agent adds unnecessary or duplicate steps (e.g., imports a library that was already imported in a previous step).
+# - FM-1.4: **Remove conversation history** - Agent ignores or removes important context from previous turns (e.g., ignores a user's correction from the previous message).
+# - FM-1.5: **Remove termination conditions** - Agent fails to define proper stopping criteria, leading to loops or unfinished tasks (e.g., writes a recursive function with no base case).
+
+# ### Functional Mistakes (FM-2.x - Communication & Coordination Errors):
+# - FM-2.1: **Repeat handled tasks** - Agent redundantly handles already completed tasks (e.g., re-writes a piece of code that was already finalized and approved).
+# - FM-2.2: **Make request ambiguous** - Agent provides unclear or confusing instructions to other agents (e.g., asks another agent to "handle the data" without specifying how).
+# - FM-2.3: **Deviate from main goal** - Agent pursues objectives unrelated to the main task (e.g., starts discussing the history of programming languages in the middle of a coding task).
+# - FM-2.4: **Hide important information** - Agent withholds crucial information needed by other agents (e.g., knows a library has a bug but doesn't mention it).
+# - FM-2.5: **Ignore other agents** - Agent fails to consider input, corrections, or questions from other agents.
+# - FM-2.6: **Inconsistent reasoning** - Agent's logic contradicts its own previous statements (e.g., in step 2 agent says 'option A is best', but in step 4 says 'option A is a bad choice' without new information).
+
+# ### Functional Mistakes (FM-3.x - Quality & Verification Errors):
+# - FM-3.1: **Premature termination** - Agent stops or declares the task complete before all requirements are met.
+# - FM-3.2: **Remove verification steps** - Agent skips necessary validation or testing steps (e.g., writes code but doesn't write any unit tests for it).
+# - FM-3.3: **Incorrect verification** - Agent performs flawed or wrong verification (e.g., writes a test that doesn't actually check for the correct condition).
+
+# ## ANALYSIS WORKFLOW
+# Please follow these steps carefully:
+
+# ### Step 1: Agent Summary
+# First, analyze and summarize what each agent has done throughout the conversation:
+# - List each agent that appears in the conversation
+# - For each agent, summarize their main actions, decisions, and contributions
+# - Note any patterns or recurring behaviors
+
+# ### Step 2: Error Analysis
+# For each agent identified in Step 1:
+# - Carefully examine their actions against each error definition
+# - Look for violations of task requirements, role boundaries, communication issues, or quality problems
+# - Note any potential errors with specific reasoning
+
+# ### Step 3: Final Judgment
+# Based on your analysis in Steps 1 and 2:
+# - Determine which agents (if any) committed errors
+# - Assign the appropriate error code(s) to each faulty agent
+# - Ensure agent names match exactly as they appear in the conversation log
+
+# ## REQUIRED OUTPUT FORMAT
+# Your response must contain:
+
+# 1. **Agent Summary**: A brief analysis of what each agent did
+# 2. **Error Analysis**: Your reasoning for identifying errors
+# 3. **Final Answer**: A valid JSON object with your conclusions
+
+# **JSON Format:**
+# {{"faulty_agents": [{{"agent_name": "XXX", "error_type": "FM-X.X"}}]}}
+
+# **Examples:**
+# - Multiple Errors: {{"faulty_agents": [{{"agent_name": "XXX1", "error_type": "FM-1.1"}}, {{"agent_name": "XXX2", "error_type": "FM-3.2"}}, {{"agent_name": "XXX3", "error_type": "FM-2.5"}}]}}
+# - No Errors: {{"faulty_agents": []}}
+
+# **Important:** Make sure the agent names you output exactly match those in the conversation log. Do not fabricate names.
+
+# ## CONVERSATION TO ANALYZE:
+# {conversation_text}
+
+# ## YOUR ANALYSIS:
+# """
+#     return COT_PROMPT_TEMPLATE.format(conversation_text=conversation_text)
 
 def format_output(output_data):
     """将输出数据格式化为JSON字符串"""
@@ -239,8 +241,8 @@ def convert_data_to_verl_format(input_file, output_file):
 
 def main():
     # 文件路径
-    input_file = "/home/fanqi/verl/data/maserror/unified_dataset/val.jsonl"
-    output_file = "/home/fanqi/verl/data/maserror/converted/val_cot.jsonl"
+    input_file = "../AEGIS/Aegis-Training/val.jsonl"
+    output_file = "converted/val.jsonl"
     
     # 检查输入文件是否存在
     if not os.path.exists(input_file):
